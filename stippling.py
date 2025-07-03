@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Weighted Voronoi Stippling with GPU and CPU Optimization.
+"""Weighted Voronoi Stippling with CPU Optimization.
 
 This module implements an optimized weighted Voronoi stippling algorithm
 for converting grayscale images into artistic stipple representations.
-The implementation includes both GPU acceleration (via CuPy) and CPU
-optimization (via Numba JIT compilation) for high-performance processing.
+The implementation uses Numba JIT compilation for high-performance processing.
 
 The stippling algorithm uses Lloyd relaxation on a weighted Voronoi diagram
 to distribute stipple points according to the input image's density. Dark
@@ -12,15 +11,13 @@ areas receive more stipples while light areas receive fewer, creating an
 artistic effect that preserves the visual structure of the original image.
 
 Key Features:
-    - GPU acceleration using CuPy for CUDA-compatible graphics cards
     - CPU optimization using Numba JIT compilation for fast processing
-    - Automatic fallback to pure Python when acceleration unavailable
+    - Automatic fallback to pure Python when Numba unavailable
     - Export to PNG images and TSP (Traveling Salesman Problem) format
     - Configurable stipple count and iteration parameters
     - Support for grayscale images of any size
 
 Performance:
-    - GPU acceleration: 10-50x speedup for large images (>1000 stipples)
     - Numba optimization: 5-15x speedup on multi-core CPUs
     - Optimized algorithms scale well with image size and stipple count
 
@@ -39,9 +36,6 @@ Dependencies:
         - scipy: Spatial data structures (cKDTree)
         - matplotlib: Plot generation and PNG output
         - numba: Just-in-time compilation for CPU optimization
-
-    Optional:
-        - cupy: GPU acceleration (CUDA required)
 """
 import argparse
 import os
@@ -56,16 +50,6 @@ import matplotlib.pyplot as plt
 from numba import jit, prange
 import warnings
 warnings.filterwarnings("ignore")
-
-# Check for GPU availability
-try:
-    import cupy as cp
-    GPU_AVAILABLE = True
-    print("[INFO] GPU support (CuPy) available")
-except ImportError:
-    GPU_AVAILABLE = False
-    print("[INFO] GPU support not available. "
-          "Install CuPy for GPU acceleration.")
 
 
 @jit(nopython=True, parallel=True)
@@ -179,156 +163,25 @@ def compute_centroids_batch_numba(labels, rho, n_points):
     return centroids
 
 
-def gpu_voronoi_labels(points, h, w, chunk_size=None):
-    """Memory-efficient GPU-accelerated Voronoi diagram computation using CuPy.
-
-    Args:
-        points (np.ndarray): Array of shape (n_points, 2) containing point
-            coordinates as (x, y) pairs.
-        h (int): Height of the output label array.
-        w (int): Width of the output label array.
-        chunk_size (int, optional): Number of pixels to process at once to
-            manage memory. If None, automatically determined based on
-            image size.
-
-    Returns:
-        np.ndarray: 2D array of shape (h, w) where each element contains the
-            index of the closest point from the input points array.
-
-    Raises:
-        RuntimeError: If GPU support is not available.
-    """
-    if not GPU_AVAILABLE:
-        raise RuntimeError("GPU support not available")
-
-    # Auto-determine chunk size based on image size and available memory
-    if chunk_size is None:
-        total_pixels = h * w
-        # Use larger chunks for larger images to reduce overhead
-        if total_pixels > 1000000:  # > 1M pixels (e.g., 1024x1024)
-            chunk_size = 16384  # 16K pixels per chunk
-        elif total_pixels > 250000:  # > 250K pixels (e.g., 512x512)
-            chunk_size = 4096   # 4K pixels per chunk
-        else:
-            chunk_size = 1024   # 1K pixels per chunk for small images
-
-    # Move points to GPU
-    points_gpu = cp.asarray(points, dtype=cp.float32)
-
-    # Create coordinate grids
-    y_coords, x_coords = cp.meshgrid(cp.arange(h), cp.arange(w), indexing='ij')
-    coords = cp.stack([x_coords.ravel(), y_coords.ravel()], axis=1)
-    coords = coords.astype(cp.float32)
-
-    total_pixels = h * w
-    labels = cp.zeros(total_pixels, dtype=cp.int32)
-
-    # Process in chunks to avoid memory overflow
-    for start_idx in range(0, total_pixels, chunk_size):
-        end_idx = min(start_idx + chunk_size, total_pixels)
-        chunk_coords = coords[start_idx:end_idx]  # (chunk_size, 2)
-
-        # Compute distances for this chunk
-        # chunk_coords: (chunk_size, 2), points: (n_points, 2)
-        chunk_expanded = chunk_coords[:, cp.newaxis, :]  # (chunk_size, 1, 2)
-        points_expanded = points_gpu[cp.newaxis, :, :]  # (1, n_points, 2)
-
-        # Compute squared distances
-        diff = chunk_expanded - points_expanded  # (chunk_size, n_points, 2)
-        distances = cp.sum(diff**2, axis=2)  # (chunk_size, n_points)
-
-        # Find closest point for each pixel in chunk
-        chunk_labels = cp.argmin(distances, axis=1)
-        labels[start_idx:end_idx] = chunk_labels
-
-    # Reshape and move back to CPU
-    return cp.asnumpy(labels.reshape(h, w))
-
-
-def gpu_compute_centroids(labels, rho, points):
-    """GPU-accelerated centroid computation using CuPy.
-
-    Args:
-        labels (np.ndarray): 2D array where each element indicates which
-            point owns that pixel.
-        rho (np.ndarray): 2D density array used for weighted centroid
-            computation.
-        points (np.ndarray): Current point positions for fallback when no
-            pixels are assigned to a point.
-
-    Returns:
-        np.ndarray: Array of shape (n_points, 2) containing the weighted
-            centroids as (x, y) coordinates.
-
-    Raises:
-        RuntimeError: If GPU support is not available.
-    """
-    if not GPU_AVAILABLE:
-        raise RuntimeError("GPU support not available")
-
-    labels_gpu = cp.asarray(labels)
-    rho_gpu = cp.asarray(rho)
-    points_gpu = cp.asarray(points, dtype=cp.float32)
-    h, w = labels.shape
-    n_points = len(points)
-
-    # Create coordinate arrays
-    y_coords, x_coords = cp.meshgrid(cp.arange(h), cp.arange(w), indexing='ij')
-
-    centroids = cp.zeros((n_points, 2), dtype=cp.float32)
-
-    for i in range(n_points):
-        mask = labels_gpu == i
-        if cp.any(mask):
-            weights = rho_gpu[mask]
-            x_vals = x_coords[mask]
-            y_vals = y_coords[mask]
-
-            if cp.sum(weights) > 0:
-                # Type ignore due to Pylance CuPy type inference issues
-                avg_x = cp.average(x_vals, weights=weights).item()  # type: ignore  # noqa: E501
-                avg_y = cp.average(y_vals, weights=weights).item()  # type: ignore  # noqa: E501
-                centroids[i, 0] = avg_x + 0.5
-                centroids[i, 1] = avg_y + 0.5
-            else:
-                centroids[i] = points_gpu[i]
-        else:
-            centroids[i] = points_gpu[i]
-
-    return cp.asnumpy(centroids)
-
-
 class OptimizedStippler:
-    """Optimized stippling class with GPU and Numba acceleration support.
+    """Optimized stippling class with Numba acceleration support.
 
     This class provides an optimized implementation of weighted Voronoi
-    stippling with support for GPU acceleration (via CuPy) and CPU
-    acceleration (via Numba JIT compilation).
+    stippling with CPU acceleration via Numba JIT compilation.
 
     Attributes:
-        use_gpu (bool): Whether to use GPU acceleration when available.
         use_numba (bool): Whether to use Numba JIT compilation.
-        chunk_size (int): Size for chunked processing (currently unused).
     """
 
-    def __init__(self, use_gpu=True, use_numba=True, chunk_size=1000):
+    def __init__(self, use_numba=True):
         """Initialize the OptimizedStippler.
 
         Args:
-            use_gpu (bool, optional): Enable GPU acceleration if available.
-                Defaults to True.
             use_numba (bool, optional): Enable Numba JIT compilation.
                 Defaults to True.
-            chunk_size (int, optional): Size for chunked processing.
-                Defaults to 1000.
         """
-        self.use_gpu = use_gpu and GPU_AVAILABLE
         self.use_numba = use_numba
-        self.chunk_size = chunk_size
-        self.gpu_failed = False  # Track if GPU has failed
 
-        print(f"[INFO] GPU acceleration: "
-              f"{'enabled' if self.use_gpu else 'disabled'}")
         print(f"[INFO] Numba acceleration: "
               f"{'enabled' if self.use_numba else 'disabled'}")
 
@@ -380,14 +233,6 @@ class OptimizedStippler:
         """
         h, w = shape
 
-        if self.use_gpu and not self.gpu_failed:
-            try:
-                return gpu_voronoi_labels(points, h, w)
-            except Exception as e:
-                self.gpu_failed = True
-                print(f"[WARN] GPU computation failed: {e}. "
-                      "Falling back to CPU.")
-
         if self.use_numba:
             return compute_voronoi_labels_numba(points, h, w)
         else:
@@ -412,14 +257,6 @@ class OptimizedStippler:
             np.ndarray: Array of shape (n_points, 2) containing the weighted
                 centroids as (x, y) coordinates.
         """
-        if self.use_gpu and not self.gpu_failed:
-            try:
-                return gpu_compute_centroids(labels, rho, points)
-            except Exception as e:
-                self.gpu_failed = True
-                print(f"[WARN] GPU computation failed: {e}. "
-                      "Falling back to CPU.")
-
         if self.use_numba:
             centroids = compute_centroids_batch_numba(labels, rho, len(points))
             # Handle points with no assigned pixels
@@ -542,8 +379,7 @@ def save_as_tsp(points, filename="stipplings/tsp/output.tsp",
 
 
 def stipple_image(image_path, output_basename=None, n_stipples=5000,
-                  n_iter=30, radius=1.0, use_gpu=True, use_numba=True,
-                  verbose=True):
+                  n_iter=30, radius=1.0, use_numba=True, verbose=True):
     """Main stippling function with optimizations.
 
     Args:
@@ -556,8 +392,6 @@ def stipple_image(image_path, output_basename=None, n_stipples=5000,
             Defaults to 30.
         radius (float, optional): Radius of each stipple for reporting.
             Defaults to 1.0.
-        use_gpu (bool, optional): Enable GPU acceleration if available.
-            Defaults to True.
         use_numba (bool, optional): Enable Numba JIT compilation.
             Defaults to True.
         verbose (bool, optional): Enable detailed logging. Defaults to True.
@@ -584,7 +418,7 @@ def stipple_image(image_path, output_basename=None, n_stipples=5000,
     rho = 1.0 - arr  # dark = dense
 
     # Initialize stippler
-    stippler = OptimizedStippler(use_gpu=use_gpu, use_numba=use_numba)
+    stippler = OptimizedStippler(use_numba=use_numba)
 
     # Process
     points = stippler.rejection_sample(rho, n_stipples)
@@ -611,7 +445,7 @@ def stipple_image(image_path, output_basename=None, n_stipples=5000,
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Optimized Weighted Voronoi Stippling with GPU and "
+        description="Optimized Weighted Voronoi Stippling with "
         "Numba acceleration"
     )
     parser.add_argument("image", help="Path to grayscale input image")
@@ -624,8 +458,6 @@ if __name__ == "__main__":
                         help="Radius of each stipple (default: 1.0)")
     parser.add_argument("--iter", type=int, default=30,
                         help="Number of Lloyd iterations (default: 30)")
-    parser.add_argument("--no-gpu", action="store_true",
-                        help="Disable GPU acceleration")
     parser.add_argument("--no-numba", action="store_true",
                         help="Disable Numba JIT compilation")
     parser.add_argument("--verbose", action="store_true",
@@ -639,7 +471,6 @@ if __name__ == "__main__":
         n_stipples=args.stipples,
         n_iter=args.iter,
         radius=args.radius,
-        use_gpu=not args.no_gpu,
         use_numba=not args.no_numba,
         verbose=args.verbose
     )
