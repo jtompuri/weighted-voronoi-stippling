@@ -1,10 +1,12 @@
-# Weighted Voronoi Stippling - Performance Optimization
+# Weighted Voronoi Stippling
 
-This repository contains multiple implementations of the Weighted Voronoi Stippling algorithm (Secord 2002) with various performance optimizations.
+This repository contains a high-performance implementation of the Weighted Voronoi Stippling algorithm (Secord 2002) with GPU and CPU optimizations for converting grayscale images into artistic stipple representations.
 
-## Optimization Strategies Implemented
+## Features
 
-### 1. Numba JIT Compilation (`optimized-stippling.py`)
+The implementation combines multiple optimization strategies in a single, unified codebase:
+
+### 1. Numba JIT Compilation
 - **Rejection Sampling**: ~10-50x speedup using `@jit(nopython=True, parallel=True)`
 - **Voronoi Computation**: Custom implementation with parallel loops
 - **Centroid Computation**: Batch processing all centroids in parallel
@@ -18,6 +20,10 @@ This repository contains multiple implementations of the Weighted Voronoi Stippl
 - **Batch Processing**: Compute all centroids simultaneously instead of one-by-one
 - **Memory Optimization**: Avoid creating individual masks for each point
 - **Efficient Data Structures**: Use contiguous arrays for better cache performance
+
+### 4. Output Formats
+- **PNG Images**: Visual representation of stipples as black dots on white background
+- **TSP Files**: Standard TSPLIB format for traveling salesman optimization
 
 ## Installation
 
@@ -37,16 +43,49 @@ pip install cupy-cuda12x
 
 ## Usage
 
+### Basic Stippling
+
 ```bash
-# CPU-only optimization (Numba)
-python optimized-stippling.py images/high-key-512px.png --stipples 5000 --iter 30
+# Basic usage with default settings
+python stippling.py images/example-512px.png
 
-# With GPU acceleration (if available)
-python optimized-stippling.py images/high-key-512px.png --stipples 5000 --iter 30
+# Specify number of stipples and iterations
+python stippling.py images/example-512px.png --stipples 5000 --iter 30
 
-# Disable specific optimizations for testing
-python optimized-stippling.py images/high-key-512px.png --no-gpu --no-numba
+# Control stipple size and output location
+python stippling.py images/example-512px.png --stipples 2000 --radius 2.0 --iter 20
 ```
+
+### Performance Options
+
+```bash
+# Disable GPU acceleration (use CPU only)
+python stippling.py images/example-512px.png --no-gpu
+
+# Disable Numba JIT compilation
+python stippling.py images/example-512px.png --no-numba
+
+# Disable all optimizations for debugging
+python stippling.py images/example-512px.png --no-gpu --no-numba
+
+# Enable verbose logging
+python stippling.py images/example-512px.png --verbose
+```
+
+### Command Line Options
+
+The main `stippling.py` script supports the following options:
+
+- `image`: Path to input grayscale image (required)
+- `--output`: Base name for output files (default: derived from input filename)
+- `--stipples`: Number of stipples to generate (default: 5000)
+- `--radius`: Radius of each stipple in pixels (default: 1.0)
+- `--iter`: Number of Lloyd relaxation iterations (default: 30)
+- `--no-gpu`: Disable GPU acceleration
+- `--no-numba`: Disable Numba JIT compilation
+- `--verbose`: Enable detailed logging
+
+Run `python stippling.py --help` for complete usage information.
 
 ## Key Optimizations Explained
 
@@ -80,7 +119,7 @@ centroids = compute_centroids_batch_numba(labels, rho, n_points)
 
 ## TSP (Traveling Salesman Problem) Integration
 
-All stippling implementations now generate TSP files containing the stipple coordinates. This enables you to:
+The stippling algorithm automatically generates TSP files containing the stipple coordinates. This enables you to:
 
 1. **Optimize stipple drawing order** using TSP solvers
 2. **Minimize pen travel distance** for physical plotting
@@ -164,34 +203,36 @@ weighted-voronoi-stippling/
 1. **Generate stipples and TSP file:**
    ```bash
    python stippling.py images/example-512px.png --stipples 5000 --iter 30
-   # Creates: stipplings/png/stipples_example-512px.png
-   #          stipplings/tsp/stipples_example-512px.tsp
+   # Creates: stipplings/png/stipples_example-512px_5000.png
+   #          stipplings/tsp/stipples_example-512px_5000.tsp
    ```
 
 2. **Solve TSP with external solver (e.g., Lin-Kernighan):**
    ```bash
    # In your TSP solver repository:
-   linkern stipplings/tsp/stipples_example-512px.tsp
-   # Creates: stipples_example-512px.tour
+   linkern stipplings/tsp/stipples_example-512px_5000.tsp
+   # Creates: stipples_example-512px_5000.tour
    ```
 
 3. **Move tour file to visualizations folder:**
    ```bash
-   mv stipples_example-512px.tour visualizations/tour/
+   mv stipples_example-512px_5000.tour visualizations/tour/
    ```
 
 4. **Visualize the optimized tour:**
    ```bash
-   python visualize.py --tsp-path stipplings/tsp/stipples_example-512px.tsp \
-                       --tour-path visualizations/tour/stipples_example-512px.tour \
-                       --output visualizations/png/final_tour.png
+   python visualize.py --tsp-path stipplings/tsp/stipples_example-512px_5000.tsp \
+                       --tour-path visualizations/tour/stipples_example-512px_5000.tour \
+                       --output visualizations/png/example_tour_5000.png
    ```
 
 ### File Naming Convention
 
-Files follow a consistent naming pattern across folders:
+Files follow a consistent naming pattern that includes the stipple count:
 - Input: `images/example-512px.png`
-- Stipples: `stipplings/png/stipples_example-512px.png`
-- TSP: `stipplings/tsp/stipples_example-512px.tsp`
-- Tour: `visualizations/tour/stipples_example-512px.tour`
-- Visualization: `visualizations/png/stipples_example-512px_tour.png`
+- Stipples: `stipplings/png/stipples_example-512px_5000.png` (includes stipple count)
+- TSP: `stipplings/tsp/stipples_example-512px_5000.tsp` (includes stipple count)
+- Tour: `visualizations/tour/stipples_example-512px_5000.tour` (matches TSP file)
+- Visualization: `visualizations/png/example_tour_visualization.png`
+
+The stipple count is automatically included in the output filenames to help distinguish between different stipple densities of the same input image.
