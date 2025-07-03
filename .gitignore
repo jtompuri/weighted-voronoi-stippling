@@ -45,14 +45,14 @@ ehthumbs.db
 Thumbs.db
 
 # Project specific
-*.png
-*.jpg
-*.jpeg
-*.tsp
-*.tour
-!images/*.png
-!images/*.jpg
-!images/*.jpeg
+# *.png
+# *.jpg
+# *.jpeg
+# *.tsp
+# *.tour
+# !images/*.png
+# !images/*.jpg
+# !images/*.jpeg
 
 # Temporary files
 temp/
