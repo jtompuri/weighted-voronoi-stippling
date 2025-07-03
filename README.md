@@ -4,9 +4,15 @@ This repository contains a high-performance implementation of the Weighted Voron
 
 ## Example output
 
+**Original example photo (1024 x 1024 px):**
+
 ![Original photo of a boy](/images/example-1024px.png)
 
+**Voronoi stippling of the photo with 10 000 stipples:**
+
 ![Voronoi stippling of the photo](/stipplings/png/example-1024px_10000.png)
+
+**Visualization of the tour created by an external Lin-Kernihan TSP Solver:**
 
 ![Visualization of the tour](/visualizations/png/example-1024px_10000.png)
 
