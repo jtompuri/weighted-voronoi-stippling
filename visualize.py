@@ -72,7 +72,7 @@ def load_tsp_coordinates(tsp_path: str) -> List[Tuple[float, float]]:
     Returns:
         list: List of tuples containing (x, y) coordinate pairs as floats.
             Each tuple represents one node's position.
-    
+
     Raises:
         FileNotFoundError: If the TSP file doesn't exist.
         ValueError: If the TSP file format is invalid or contains no
@@ -80,7 +80,7 @@ def load_tsp_coordinates(tsp_path: str) -> List[Tuple[float, float]]:
     """
     if not os.path.exists(tsp_path):
         raise FileNotFoundError(f"TSP file not found: {tsp_path}")
-    
+
     coords = []
     with open(tsp_path, 'r') as f:
         in_section = False
@@ -100,10 +100,10 @@ def load_tsp_coordinates(tsp_path: str) -> List[Tuple[float, float]]:
                         print(f"Warning: Skipping invalid coordinate line: "
                               f"{line}")
                         continue
-    
+
     if not coords:
         raise ValueError(f"No valid coordinates found in TSP file: {tsp_path}")
-    
+
     return coords
 
 
@@ -126,13 +126,13 @@ def load_linkern_tour(tour_path: str) -> List[int]:
     """
     if not os.path.exists(tour_path):
         raise FileNotFoundError(f"Tour file not found: {tour_path}")
-    
+
     tour = []
     with open(tour_path, 'r') as f:
         lines = f.readlines()[1:]  # Skip first line (node count)
         if not lines:
             raise ValueError(f"No tour data found in file: {tour_path}")
-        
+
         try:
             current = int(lines[0].split()[0])
             tour.append(current)
@@ -143,10 +143,10 @@ def load_linkern_tour(tour_path: str) -> List[int]:
                     tour.append(next_node)
         except (ValueError, IndexError) as e:
             raise ValueError(f"Invalid tour file format: {tour_path}") from e
-    
+
     if not tour:
         raise ValueError(f"No valid tour data found in file: {tour_path}")
-    
+
     return tour
 
 
@@ -169,10 +169,10 @@ def plot_points_only(coords: List[Tuple[float, float]],
 
     plt.figure(figsize=(10, 10))
     plt.scatter(x, y, s=point_size, c='black', marker='.')
-    
+
     # Set origin to top-left corner (like image coordinates)
     plt.gca().invert_yaxis()
-    
+
     # Hide axes and frame
     plt.axis('off')
     plt.axis('equal')
@@ -206,7 +206,7 @@ def plot_tour(coords: List[Tuple[float, float]], tour: List[int],
         line_color: Color of the tour line.
         show_points: Whether to show the stipple points on top of the lines.
         point_size: Size of points if show_points is True.
-    
+
     Raises:
         ValueError: If tour contains invalid node indices.
     """
@@ -216,7 +216,7 @@ def plot_tour(coords: List[Tuple[float, float]], tour: List[int],
         if node_idx < 0 or node_idx > max_coord_index:
             raise ValueError(f"Tour contains invalid node index {node_idx}. "
                              f"Valid range: 0-{max_coord_index}")
-    
+
     # Extract coordinates and close the tour loop
     x = [coords[i][0] for i in tour] + [coords[tour[0]][0]]
     y = [coords[i][1] for i in tour] + [coords[tour[0]][1]]
@@ -235,7 +235,7 @@ def plot_tour(coords: List[Tuple[float, float]], tour: List[int],
 
     # Set origin to top-left corner (like image coordinates)
     plt.gca().invert_yaxis()
-    
+
     # Hide axes and frame
     plt.axis('off')
     plt.axis('equal')
@@ -296,7 +296,7 @@ def main():
                 tsp_path = matches[0]  # Use first match
                 print(f"Using default TSP file: {tsp_path}")
                 break
-        
+
         if not tsp_path:
             parser.error("TSP file path is required. Specify as positional "
                          "argument or use --tsp-path")
@@ -321,13 +321,13 @@ def main():
             if not args.tour_path:
                 parser.error("--lines-only requires --tour-path to be "
                              "specified")
-            
+
             tour = load_linkern_tour(args.tour_path)
             print(f"Loaded tour with {len(tour)} nodes from {args.tour_path}")
-            
+
             # Lines-only mode: never show points unless explicitly requested
             show_points = args.show_points and not args.lines_only
-            
+
             plot_tour(coords, tour, args.output, args.line_width,
                       args.line_color, show_points, args.point_size)
         else:
