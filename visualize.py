@@ -31,19 +31,19 @@ Coordinate System:
 
 Example:
     Basic usage for visualizing a TSP tour:
-        >>> coords = load_tsp_coordinates('stipplings/tsp/stipples.tsp')
-        >>> tour = load_linkern_tour('visualizations/tour/stipples.tour')
+        >>> coords = load_tsp_coordinates('stipplings/tsp/image_5000.tsp')
+        >>> tour = load_linkern_tour('visualizations/tour/image_5000.tour')
         >>> plot_flipped_tour(coords, tour)
 
     Loading coordinates only:
-        >>> coords = load_tsp_coordinates('stipplings/tsp/stipples.tsp')
+        >>> coords = load_tsp_coordinates('stipplings/tsp/image_5000.tsp')
         >>> print(f"Loaded {len(coords)} stipple points")
 
     Command line usage:
-        $ python visualize.py --tsp-path stipplings/tsp/stipples.tsp \\
-            --tour-path visualizations/tour/stipples.tour
-        $ python visualize.py --tsp-path stipplings/tsp/stipples.tsp \\
-            --tour-path visualizations/tour/stipples.tour \\
+        $ python visualize.py --tsp-path stipplings/tsp/image_5000.tsp \\
+            --tour-path visualizations/tour/image_5000.tour
+        $ python visualize.py --tsp-path stipplings/tsp/image_5000.tsp \\
+            --tour-path visualizations/tour/image_5000.tour \\
             --output visualizations/png/tour.png
 
 Dependencies:

@@ -447,7 +447,7 @@ class OptimizedStippler:
         return points
 
 
-def save_as_png(points, size, filename="stipplings/png/stipples.png",
+def save_as_png(points, size, filename="stipplings/png/output.png",
                 radius=1.0):
     """Save stipples as PNG image.
 
@@ -456,7 +456,7 @@ def save_as_png(points, size, filename="stipplings/png/stipples.png",
             coordinates as (x, y) pairs.
         size (tuple): Output image size as (width, height).
         filename (str, optional): Output filename.
-            Defaults to "stipplings/png/stipples.png".
+            Defaults to "stipplings/png/output.png".
         radius (float, optional): Radius of each stipple in pixels.
             Defaults to 1.0.
     """
@@ -477,17 +477,17 @@ def save_as_png(points, size, filename="stipplings/png/stipples.png",
     plt.close()
 
 
-def save_as_tsp(points, filename="stipplings/tsp/stipples.tsp",
-                name="STIPPLES"):
+def save_as_tsp(points, filename="stipplings/tsp/output.tsp",
+                name="OUTPUT"):
     """Save stipples as TSP (Traveling Salesman Problem) file format.
 
     Args:
         points (np.ndarray): Array of shape (n_points, 2) containing point
             coordinates as (x, y) pairs.
         filename (str, optional): Output filename.
-            Defaults to "stipplings/tsp/stipples.tsp".
+            Defaults to "stipplings/tsp/output.tsp".
         name (str, optional): Problem name to write in TSP header.
-            Defaults to "STIPPLES".
+            Defaults to "OUTPUT".
     """
     print(f"[INFO] Saving stipples to TSP: {filename}")
 
@@ -539,7 +539,7 @@ def stipple_image(image_path, output_basename=None, n_stipples=5000,
     # Generate output basename from input filename if not provided
     if output_basename is None:
         input_name = os.path.splitext(os.path.basename(image_path))[0]
-        output_basename = f"stipples_{input_name}_{n_stipples}"
+        output_basename = f"{input_name}_{n_stipples}"
 
     # Load image
     img = Image.open(image_path).convert("L")
