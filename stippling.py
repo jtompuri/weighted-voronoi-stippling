@@ -48,7 +48,10 @@ import os
 import time
 import numpy as np
 from PIL import Image
-from scipy.spatial import cKDTree
+try:
+    from scipy.spatial import cKDTree  # type: ignore
+except ImportError:
+    from scipy.spatial import KDTree as cKDTree  # type: ignore
 import matplotlib.pyplot as plt
 from numba import jit, prange
 import warnings
@@ -176,7 +179,7 @@ def compute_centroids_batch_numba(labels, rho, n_points):
     return centroids
 
 
-def gpu_voronoi_labels(points, h, w, chunk_size=1024):
+def gpu_voronoi_labels(points, h, w, chunk_size=None):
     """Memory-efficient GPU-accelerated Voronoi diagram computation using CuPy.
 
     Args:
@@ -184,7 +187,9 @@ def gpu_voronoi_labels(points, h, w, chunk_size=1024):
             coordinates as (x, y) pairs.
         h (int): Height of the output label array.
         w (int): Width of the output label array.
-        chunk_size (int): Number of pixels to process at once to manage memory.
+        chunk_size (int, optional): Number of pixels to process at once to
+            manage memory. If None, automatically determined based on
+            image size.
 
     Returns:
         np.ndarray: 2D array of shape (h, w) where each element contains the
@@ -196,31 +201,42 @@ def gpu_voronoi_labels(points, h, w, chunk_size=1024):
     if not GPU_AVAILABLE:
         raise RuntimeError("GPU support not available")
 
+    # Auto-determine chunk size based on image size and available memory
+    if chunk_size is None:
+        total_pixels = h * w
+        # Use larger chunks for larger images to reduce overhead
+        if total_pixels > 1000000:  # > 1M pixels (e.g., 1024x1024)
+            chunk_size = 16384  # 16K pixels per chunk
+        elif total_pixels > 250000:  # > 250K pixels (e.g., 512x512)
+            chunk_size = 4096   # 4K pixels per chunk
+        else:
+            chunk_size = 1024   # 1K pixels per chunk for small images
+
     # Move points to GPU
     points_gpu = cp.asarray(points, dtype=cp.float32)
-    
+
     # Create coordinate grids
     y_coords, x_coords = cp.meshgrid(cp.arange(h), cp.arange(w), indexing='ij')
     coords = cp.stack([x_coords.ravel(), y_coords.ravel()], axis=1)
     coords = coords.astype(cp.float32)
-    
+
     total_pixels = h * w
     labels = cp.zeros(total_pixels, dtype=cp.int32)
-    
+
     # Process in chunks to avoid memory overflow
     for start_idx in range(0, total_pixels, chunk_size):
         end_idx = min(start_idx + chunk_size, total_pixels)
         chunk_coords = coords[start_idx:end_idx]  # (chunk_size, 2)
-        
+
         # Compute distances for this chunk
         # chunk_coords: (chunk_size, 2), points: (n_points, 2)
         chunk_expanded = chunk_coords[:, cp.newaxis, :]  # (chunk_size, 1, 2)
         points_expanded = points_gpu[cp.newaxis, :, :]  # (1, n_points, 2)
-        
+
         # Compute squared distances
         diff = chunk_expanded - points_expanded  # (chunk_size, n_points, 2)
         distances = cp.sum(diff**2, axis=2)  # (chunk_size, n_points)
-        
+
         # Find closest point for each pixel in chunk
         chunk_labels = cp.argmin(distances, axis=1)
         labels[start_idx:end_idx] = chunk_labels
@@ -269,8 +285,11 @@ def gpu_compute_centroids(labels, rho, points):
             y_vals = y_coords[mask]
 
             if cp.sum(weights) > 0:
-                centroids[i, 0] = cp.average(x_vals, weights=weights) + 0.5
-                centroids[i, 1] = cp.average(y_vals, weights=weights) + 0.5
+                # Type ignore due to Pylance CuPy type inference issues
+                avg_x = cp.average(x_vals, weights=weights).item()  # type: ignore  # noqa: E501
+                avg_y = cp.average(y_vals, weights=weights).item()  # type: ignore  # noqa: E501
+                centroids[i, 0] = avg_x + 0.5
+                centroids[i, 1] = avg_y + 0.5
             else:
                 centroids[i] = points_gpu[i]
         else:
