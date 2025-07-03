@@ -2,6 +2,14 @@
 
 This repository contains a high-performance implementation of the Weighted Voronoi Stippling algorithm (Secord 2002) with GPU and CPU optimizations for converting grayscale images into artistic stipple representations.
 
+## Example output
+
+[Original photo of a boy](/images/example-1024px.png)
+
+[Voronoi stippling of the photo](/stipplings/png/stipples_example-1024px_10000.png)
+
+[Visualization of the tour](/visualizations/png/example-1024px_10000.png)
+
 ## Features
 
 The implementation combines multiple optimization strategies in a single, unified codebase:
