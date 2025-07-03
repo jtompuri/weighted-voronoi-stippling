@@ -126,6 +126,7 @@ centroids = compute_centroids_batch_numba(labels, rho, n_points)
 
 ## References
 
+- [TSP Art by Robert Bosch](https://www2.oberlin.edu/math/faculty/bosch/tspart-page.html)
 - Secord, A. (2002). "Weighted Voronoi stippling"
 - Lloyd, S. (1982). "Least squares quantization in PCM"
 - Numba Documentation: https://numba.pydata.org/
