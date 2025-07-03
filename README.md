@@ -14,7 +14,7 @@ This repository contains a high-performance CPU implementation of the Weighted V
 
 **Visualization of the tour created by an external Lin-Kernihan TSP Solver:**
 
-![Visualization of the tour](/images/example-1024px_1000v.png)
+![Visualization of the tour](/images/example-1024px_10000v.png)
 
 ## Features
 
