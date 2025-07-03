@@ -539,7 +539,7 @@ def stipple_image(image_path, output_basename=None, n_stipples=5000,
     # Generate output basename from input filename if not provided
     if output_basename is None:
         input_name = os.path.splitext(os.path.basename(image_path))[0]
-        output_basename = f"stipples_{input_name}"
+        output_basename = f"stipples_{input_name}_{n_stipples}"
 
     # Load image
     img = Image.open(image_path).convert("L")
