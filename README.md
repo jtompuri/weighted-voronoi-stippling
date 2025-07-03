@@ -10,11 +10,11 @@ This repository contains a high-performance CPU implementation of the Weighted V
 
 **Voronoi stippling of the photo with 10 000 stipples:**
 
-![Voronoi stippling of the photo](/stipplings/png/example-1024px_10000.png)
+![Voronoi stippling of the photo](/images/example-1024px_10000.png)
 
 **Visualization of the tour created by an external Lin-Kernihan TSP Solver:**
 
-![Visualization of the tour](/visualizations/png/example-1024px_10000.png)
+![Visualization of the tour](/images/example-1024px_1000v.png)
 
 ## Features
 
