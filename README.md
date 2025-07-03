@@ -121,6 +121,6 @@ Files are automatically named with stipple counts: `example_5000.png`, `example_
 
 ## References
 
-- Secord, A. (2002). "Weighted Voronoi stippling"
+- [Secord, A. (2002). "Weighted Voronoi stippling"](https://www.cs.ubc.ca/labs/imager/tr/2002/secord2002b/secord.2002b.pdf)
 - [TSP Art by Robert Bosch](https://www2.oberlin.edu/math/faculty/bosch/tspart-page.html)
 - [Numba Documentation](https://numba.pydata.org/)
