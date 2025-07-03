@@ -125,8 +125,8 @@ linkern stipplings/tsp/example-512px_5000.tsp
 
 #### Option C: Using Online TSP Solvers
 1. Upload your `.tsp` file to online solvers like:
-   - [NEOS Server](https://neos-server.org/neos/)
-   - [TSP solver websites](http://www.math.uwaterloo.ca/tsp/concorde.html)
+   - [NEOS Server](https://neos-server.org/neos/solvers/co:concorde/TSP.html)
+
 2. Download the solution and convert to `.tour` format
 
 #### Option D: Generate Simple Tours with tsp_utils.py
