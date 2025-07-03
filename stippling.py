@@ -176,14 +176,15 @@ def compute_centroids_batch_numba(labels, rho, n_points):
     return centroids
 
 
-def gpu_voronoi_labels(points, h, w):
-    """GPU-accelerated Voronoi diagram computation using CuPy.
+def gpu_voronoi_labels(points, h, w, chunk_size=1024):
+    """Memory-efficient GPU-accelerated Voronoi diagram computation using CuPy.
 
     Args:
         points (np.ndarray): Array of shape (n_points, 2) containing point
             coordinates as (x, y) pairs.
         h (int): Height of the output label array.
         w (int): Width of the output label array.
+        chunk_size (int): Number of pixels to process at once to manage memory.
 
     Returns:
         np.ndarray: 2D array of shape (h, w) where each element contains the
@@ -195,24 +196,34 @@ def gpu_voronoi_labels(points, h, w):
     if not GPU_AVAILABLE:
         raise RuntimeError("GPU support not available")
 
-    # Move data to GPU
-    points_gpu = cp.asarray(points)
-
+    # Move points to GPU
+    points_gpu = cp.asarray(points, dtype=cp.float32)
+    
     # Create coordinate grids
     y_coords, x_coords = cp.meshgrid(cp.arange(h), cp.arange(w), indexing='ij')
     coords = cp.stack([x_coords.ravel(), y_coords.ravel()], axis=1)
-
-    # Compute distances using broadcasting
-    # coords: (h*w, 2), points: (n_points, 2)
-    coords_expanded = coords[:, cp.newaxis, :]  # (h*w, 1, 2)
-    points_expanded = points_gpu[cp.newaxis, :, :]  # (1, n_points, 2)
-
-    # Compute squared distances
-    diff = coords_expanded - points_expanded  # (h*w, n_points, 2)
-    distances = cp.sum(diff**2, axis=2)  # (h*w, n_points)
-
-    # Find closest point for each pixel
-    labels = cp.argmin(distances, axis=1)
+    coords = coords.astype(cp.float32)
+    
+    total_pixels = h * w
+    labels = cp.zeros(total_pixels, dtype=cp.int32)
+    
+    # Process in chunks to avoid memory overflow
+    for start_idx in range(0, total_pixels, chunk_size):
+        end_idx = min(start_idx + chunk_size, total_pixels)
+        chunk_coords = coords[start_idx:end_idx]  # (chunk_size, 2)
+        
+        # Compute distances for this chunk
+        # chunk_coords: (chunk_size, 2), points: (n_points, 2)
+        chunk_expanded = chunk_coords[:, cp.newaxis, :]  # (chunk_size, 1, 2)
+        points_expanded = points_gpu[cp.newaxis, :, :]  # (1, n_points, 2)
+        
+        # Compute squared distances
+        diff = chunk_expanded - points_expanded  # (chunk_size, n_points, 2)
+        distances = cp.sum(diff**2, axis=2)  # (chunk_size, n_points)
+        
+        # Find closest point for each pixel in chunk
+        chunk_labels = cp.argmin(distances, axis=1)
+        labels[start_idx:end_idx] = chunk_labels
 
     # Reshape and move back to CPU
     return cp.asnumpy(labels.reshape(h, w))
@@ -241,6 +252,7 @@ def gpu_compute_centroids(labels, rho, points):
 
     labels_gpu = cp.asarray(labels)
     rho_gpu = cp.asarray(rho)
+    points_gpu = cp.asarray(points, dtype=cp.float32)
     h, w = labels.shape
     n_points = len(points)
 
@@ -260,9 +272,9 @@ def gpu_compute_centroids(labels, rho, points):
                 centroids[i, 0] = cp.average(x_vals, weights=weights) + 0.5
                 centroids[i, 1] = cp.average(y_vals, weights=weights) + 0.5
             else:
-                centroids[i] = points[i]
+                centroids[i] = points_gpu[i]
         else:
-            centroids[i] = points[i]
+            centroids[i] = points_gpu[i]
 
     return cp.asnumpy(centroids)
 
@@ -294,6 +306,7 @@ class OptimizedStippler:
         self.use_gpu = use_gpu and GPU_AVAILABLE
         self.use_numba = use_numba
         self.chunk_size = chunk_size
+        self.gpu_failed = False  # Track if GPU has failed
 
         print(f"[INFO] GPU acceleration: "
               f"{'enabled' if self.use_gpu else 'disabled'}")
@@ -348,10 +361,11 @@ class OptimizedStippler:
         """
         h, w = shape
 
-        if self.use_gpu:
+        if self.use_gpu and not self.gpu_failed:
             try:
                 return gpu_voronoi_labels(points, h, w)
             except Exception as e:
+                self.gpu_failed = True
                 print(f"[WARN] GPU computation failed: {e}. "
                       "Falling back to CPU.")
 
@@ -379,10 +393,11 @@ class OptimizedStippler:
             np.ndarray: Array of shape (n_points, 2) containing the weighted
                 centroids as (x, y) coordinates.
         """
-        if self.use_gpu:
+        if self.use_gpu and not self.gpu_failed:
             try:
                 return gpu_compute_centroids(labels, rho, points)
             except Exception as e:
+                self.gpu_failed = True
                 print(f"[WARN] GPU computation failed: {e}. "
                       "Falling back to CPU.")
 
