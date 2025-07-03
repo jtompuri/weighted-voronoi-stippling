@@ -6,7 +6,7 @@ This repository contains a high-performance implementation of the Weighted Voron
 
 [Original photo of a boy](/images/example-1024px.png)
 
-[Voronoi stippling of the photo](/stipplings/png/stipples_example-1024px_10000.png)
+[Voronoi stippling of the photo](/stipplings/png/example-1024px_10000.png)
 
 [Visualization of the tour](/visualizations/png/example-1024px_10000.png)
 
@@ -137,7 +137,7 @@ The stippling algorithm automatically generates TSP files containing the stipple
 
 The generated `.tsp` files follow the standard TSPLIB format:
 ```
-NAME: STIPPLES_NAME
+NAME: INPUT_FILENAME
 TYPE: TSP
 COMMENT: Stipple points for Traveling Salesman Problem
 DIMENSION: 5000
@@ -178,12 +178,12 @@ For optimal results with large stipple sets, consider:
 1. **Concorde TSP Solver**: Industry-standard exact TSP solver
    ```bash
    # After exporting with tsp_utils.py
-   concorde stipples_concorde.tsp
+   concorde example-512px_5000_concorde.tsp
    ```
 
 2. **Lin-Kernighan Solver within Concorde package**: Fast heuristic for large instances
    ```bash
-   linkern stipples_concorde.tsp
+   linkern example-512px_5000_concorde.tsp
    ```
 
 ## Workflow and File Organization
@@ -211,26 +211,26 @@ weighted-voronoi-stippling/
 1. **Generate stipples and TSP file:**
    ```bash
    python stippling.py images/example-512px.png --stipples 5000 --iter 30
-   # Creates: stipplings/png/stipples_example-512px_5000.png
-   #          stipplings/tsp/stipples_example-512px_5000.tsp
+   # Creates: stipplings/png/example-512px_5000.png
+   #          stipplings/tsp/example-512px_5000.tsp
    ```
 
 2. **Solve TSP with external solver (e.g., Lin-Kernighan):**
    ```bash
    # In your TSP solver repository:
-   linkern stipplings/tsp/stipples_example-512px_5000.tsp
-   # Creates: stipples_example-512px_5000.tour
+   linkern stipplings/tsp/example-512px_5000.tsp
+   # Creates: example-512px_5000.tour
    ```
 
 3. **Move tour file to visualizations folder:**
    ```bash
-   mv stipples_example-512px_5000.tour visualizations/tour/
+   mv example-512px_5000.tour visualizations/tour/
    ```
 
 4. **Visualize the optimized tour:**
    ```bash
-   python visualize.py --tsp-path stipplings/tsp/stipples_example-512px_5000.tsp \
-                       --tour-path visualizations/tour/stipples_example-512px_5000.tour \
+   python visualize.py --tsp-path stipplings/tsp/example-512px_5000.tsp \
+                       --tour-path visualizations/tour/example-512px_5000.tour \
                        --output visualizations/png/example_tour_5000.png
    ```
 
@@ -238,9 +238,9 @@ weighted-voronoi-stippling/
 
 Files follow a consistent naming pattern that includes the stipple count:
 - Input: `images/example-512px.png`
-- Stipples: `stipplings/png/stipples_example-512px_5000.png` (includes stipple count)
-- TSP: `stipplings/tsp/stipples_example-512px_5000.tsp` (includes stipple count)
-- Tour: `visualizations/tour/stipples_example-512px_5000.tour` (matches TSP file)
+- Stipples: `stipplings/png/example-512px_5000.png` (includes stipple count)
+- TSP: `stipplings/tsp/example-512px_5000.tsp` (includes stipple count)
+- Tour: `visualizations/tour/example-512px_5000.tour` (matches TSP file)
 - Visualization: `visualizations/png/example_tour_visualization.png`
 
 The stipple count is automatically included in the output filenames to help distinguish between different stipple densities of the same input image.
