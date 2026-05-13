@@ -49,9 +49,12 @@ python stippling.py images/photo.jpg --stipples 10000 --iter 50 --radius 2.0
 python visualize.py stipplings/tsp/photo_5000.tsp --points-only
 ```
 
-**Tour lines (requires .tour file from TSP solver):**
+**Tour lines (supports TSPLIB TOUR, Concorde .sol, and linkern output):**
 ```bash
 python visualize.py stipplings/tsp/photo_5000.tsp --tour-path path/to/photo.tour
+python visualize.py stipplings/tsp/photo_5000.tsp --tour-path photo_5000.sol
+python visualize.py stipplings/tsp/photo_5000.tsp --tour-path photo_5000.opt.tour
+python visualize.py stipplings/tsp/photo_5000.tsp --tour-path photo_5000.heu.tour
 ```
 
 ### TSP Integration for Line Art
@@ -68,7 +71,7 @@ python visualize.py stipplings/tsp/photo_5000.tsp --tour-path visualizations/tou
 **Option 2: Concorde (optimal solution)**
 ```bash
 concorde stipplings/tsp/photo_5000.tsp
-# Convert .sol to .tour format if needed
+python visualize.py stipplings/tsp/photo_5000.tsp --tour-path photo_5000.sol
 ```
 
 **Option 3: Online solvers**
@@ -90,7 +93,9 @@ Upload your `.tsp` file to [NEOS Server](https://neos-server.org/neos/solvers/co
 |--------|-------------|
 | `--points-only` | Show only stipple points |
 | `--lines-only` | Show only tour lines |
-| `--tour-path` | Path to .tour file |
+| `--tour-path` | Path to TSPLIB TOUR/.sol/linkern tour file |
+| `--tour-format` | `auto`, `tsplib`, `concorde-sol`, `linkern` |
+| `--tour-index-base` | Concorde index base: `auto`, `0`, `1` |
 | `--output` | Save to file instead of display |
 | `--point-size` | Point size (default: 1.0) |
 | `--line-width` | Line width (default: 2.0) |

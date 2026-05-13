@@ -23,7 +23,8 @@ Key Features:
 
 Supported File Formats:
     - TSP files: Standard TSPLIB format with NODE_COORD_SECTION
-    - Tour files: Linkern solver output format with node sequences
+    - Tour files: TSPLIB TOUR (.tour/.opt.tour/.heu.tour), Concorde .sol,
+      and Linkern tour output
 
 Coordinate System:
     The module uses a top-left origin coordinate system that matches
@@ -37,6 +38,9 @@ Command line usage:
         --tour-path visualizations/tour/image_5000.tour --lines-only
     $ python visualize.py --tsp-path stipplings/tsp/image_5000.tsp \\
         --tour-path tour.tour --show-points --output tour.png
+    $ python visualize.py stipplings/tsp/photo_5000.tsp --tour-path photo_5000.sol
+    $ python visualize.py stipplings/tsp/photo_5000.tsp --tour-path photo_5000.opt.tour
+    $ python visualize.py stipplings/tsp/photo_5000.tsp --tour-path photo_5000.heu.tour
 
 Dependencies:
     - matplotlib: For plotting and visualization
@@ -124,29 +128,189 @@ def load_linkern_tour(tour_path: str) -> List[int]:
         FileNotFoundError: If the tour file doesn't exist.
         ValueError: If no tour data is found in the file or format is invalid.
     """
+    return load_tour(
+        tour_path=tour_path,
+        expected_nodes=None,
+        tour_format="linkern",
+        index_base="0",
+    )
+
+
+def _detect_tour_format(
+    tour_path: str, content: str, expected_nodes: Optional[int]
+) -> str:
+    if "TOUR_SECTION" in content:
+        return "tsplib"
+    if tour_path.lower().endswith(".sol"):
+        return "concorde-sol"
+    if expected_nodes is not None:
+        try:
+            values = [int(tok) for tok in content.split()]
+        except ValueError:
+            values = []
+        if len(values) == expected_nodes:
+            return "concorde-sol"
+        if len(values) == expected_nodes + 1 and values and values[0] == expected_nodes:
+            return "concorde-sol"
+    return "linkern"
+
+
+def _validate_tour(
+    tour: List[int], tour_path: str, fmt: str, expected_nodes: Optional[int]
+) -> None:
+    if not tour:
+        raise ValueError(f"Invalid tour in {tour_path} (format={fmt}): empty tour")
+    if any(node < 0 for node in tour):
+        raise ValueError(
+            f"Invalid tour in {tour_path} (format={fmt}): negative node id after conversion"
+        )
+    if expected_nodes is not None:
+        for node in tour:
+            if node < 0 or node >= expected_nodes:
+                raise ValueError(
+                    f"Invalid tour in {tour_path} (format={fmt}): node id {node} is outside expected_nodes range 0..{expected_nodes - 1}"
+                )
+        if len(tour) != expected_nodes:
+            raise ValueError(
+                f"Invalid tour in {tour_path} (format={fmt}): length mismatch, got {len(tour)}, expected {expected_nodes}"
+            )
+        seen = set(tour)
+        duplicates = len(seen) != len(tour)
+        missing = sorted(set(range(expected_nodes)) - seen)
+        if duplicates and missing:
+            raise ValueError(
+                f"Invalid tour in {tour_path} (format={fmt}): duplicate and missing node ids detected"
+            )
+        if duplicates:
+            raise ValueError(
+                f"Invalid tour in {tour_path} (format={fmt}): duplicate node ids detected"
+            )
+        if missing:
+            raise ValueError(
+                f"Invalid tour in {tour_path} (format={fmt}): missing node ids detected"
+            )
+
+
+def _parse_tsplib_tour(tour_path: str, content: str) -> List[int]:
+    in_section = False
+    nodes: List[int] = []
+    for raw_line in content.splitlines():
+        line = raw_line.strip()
+        if not in_section:
+            if line == "TOUR_SECTION":
+                in_section = True
+            continue
+        if line == "EOF":
+            break
+        for tok in line.split():
+            try:
+                value = int(tok)
+            except ValueError as e:
+                raise ValueError(
+                    f"Invalid tour in {tour_path} (format=tsplib): non-integer token '{tok}'"
+                ) from e
+            if value == -1:
+                return [node - 1 for node in nodes]
+            nodes.append(value)
+    return [node - 1 for node in nodes]
+
+
+def _parse_concorde_sol(
+    tour_path: str, content: str, expected_nodes: Optional[int], index_base: str
+) -> List[int]:
+    tokens = content.split()
+    if not tokens:
+        return []
+    try:
+        values = [int(tok) for tok in tokens]
+    except ValueError as e:
+        raise ValueError(
+            f"Invalid tour in {tour_path} (format=concorde-sol): non-integer content"
+        ) from e
+
+    node_values = values
+    if (
+        expected_nodes is not None
+        and len(values) >= 1
+        and values[0] == expected_nodes
+        and len(values[1:]) == expected_nodes
+    ):
+        node_values = values[1:]
+
+    base = index_base
+    if base == "auto":
+        if any(v == 0 for v in node_values):
+            base = "0"
+        elif (
+            expected_nodes is not None
+            and all(1 <= v <= expected_nodes for v in node_values)
+        ):
+            base = "1"
+        elif expected_nodes is None and all(v >= 0 for v in node_values):
+            base = "0"
+        else:
+            raise ValueError(
+                f"Invalid tour in {tour_path} (format=concorde-sol): could not infer index base"
+            )
+
+    if base == "1":
+        return [v - 1 for v in node_values]
+    return node_values
+
+
+def _parse_linkern_tour(tour_path: str, content: str) -> List[int]:
+    tour: List[int] = []
+    lines = content.splitlines()
+    edge_lines = lines[1:]
+    if not edge_lines:
+        return []
+    try:
+        current = int(edge_lines[0].split()[0])
+        tour.append(current)
+        for line in edge_lines:
+            parts = line.strip().split()
+            if len(parts) >= 2:
+                tour.append(int(parts[1]))
+    except (ValueError, IndexError) as e:
+        raise ValueError(
+            f"Invalid tour in {tour_path} (format=linkern): invalid linkern content"
+        ) from e
+    if len(tour) >= 2 and tour[-1] == tour[0]:
+        tour.pop()
+    return tour
+
+
+def load_tour(
+    tour_path: str,
+    expected_nodes: int | None = None,
+    tour_format: str = "auto",
+    index_base: str = "auto",
+) -> List[int]:
+    """Load a tour and normalize node ids to 0-based list[int].
+
+    Supports TSPLIB TOUR, Concorde .sol, and linkern tour output.
+    """
     if not os.path.exists(tour_path):
         raise FileNotFoundError(f"Tour file not found: {tour_path}")
+    if tour_format not in {"auto", "tsplib", "concorde-sol", "linkern"}:
+        raise ValueError(f"Invalid tour format '{tour_format}' for {tour_path}")
+    if index_base not in {"auto", "0", "1"}:
+        raise ValueError(f"Invalid index base '{index_base}' for {tour_path}")
 
-    tour = []
-    with open(tour_path, 'r') as f:
-        lines = f.readlines()[1:]  # Skip first line (node count)
-        if not lines:
-            raise ValueError(f"No tour data found in file: {tour_path}")
+    with open(tour_path, "r") as f:
+        content = f.read()
 
-        try:
-            current = int(lines[0].split()[0])
-            tour.append(current)
-            for line in lines:
-                parts = line.strip().split()
-                if len(parts) >= 2:
-                    next_node = int(parts[1])
-                    tour.append(next_node)
-        except (ValueError, IndexError) as e:
-            raise ValueError(f"Invalid tour file format: {tour_path}") from e
+    detected_format = _detect_tour_format(tour_path, content, expected_nodes)
+    fmt = detected_format if tour_format == "auto" else tour_format
 
-    if not tour:
-        raise ValueError(f"No valid tour data found in file: {tour_path}")
+    if fmt == "tsplib":
+        tour = _parse_tsplib_tour(tour_path, content)
+    elif fmt == "concorde-sol":
+        tour = _parse_concorde_sol(tour_path, content, expected_nodes, index_base)
+    else:
+        tour = _parse_linkern_tour(tour_path, content)
 
+    _validate_tour(tour, tour_path, fmt, expected_nodes)
     return tour
 
 
@@ -260,7 +424,17 @@ def main():
                         help="Alternative way to specify TSP file path")
     parser.add_argument("--tour-path", "--tour",
                         help="Path to tour file containing TSP solution "
-                             "(optional, if not provided, shows points only)")
+                             "(TSPLIB TOUR/.sol/linkern; optional, if not "
+                             "provided, shows points only)")
+    parser.add_argument("--tour-format",
+                        choices=["auto", "tsplib", "concorde-sol", "linkern"],
+                        default="auto",
+                        help="Tour input format (default: auto)")
+    parser.add_argument("--tour-index-base",
+                        choices=["auto", "0", "1"],
+                        default="auto",
+                        help="Node index base for concorde-sol parsing "
+                             "(default: auto)")
     parser.add_argument("--output", "-o",
                         help="Save plot to file instead of displaying "
                              "(suggested: visualizations/png/filename.png)")
@@ -322,7 +496,12 @@ def main():
                 parser.error("--lines-only requires --tour-path to be "
                              "specified")
 
-            tour = load_linkern_tour(args.tour_path)
+            tour = load_tour(
+                args.tour_path,
+                expected_nodes=len(coords),
+                tour_format=args.tour_format,
+                index_base=args.tour_index_base,
+            )
             print(f"Loaded tour with {len(tour)} nodes from {args.tour_path}")
 
             # Lines-only mode: never show points unless explicitly requested
