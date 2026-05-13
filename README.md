@@ -57,21 +57,49 @@ python visualize.py stipplings/tsp/photo_5000.tsp --tour-path photo_5000.opt.tou
 python visualize.py stipplings/tsp/photo_5000.tsp --tour-path photo_5000.heu.tour
 ```
 
-### TSP Integration for Line Art
+Accepted tour formats:
+- TSPLIB TOUR files (`.tour`, `.opt.tour`, `.heu.tour`)
+- Concorde integer-sequence outputs (`.sol` and similar)
+- Concorde linkern tour output
+
+`--tour-format` defaults to `auto`, so you usually only need `--tour-path`.
+Use `--tour-format` and `--tour-index-base` only for troubleshooting format/base detection.
+
+### TSP Solver Workflows
 
 To create continuous line drawings, solve the TSP using external solvers:
 
-**Option 1: Lin-Kernighan (fast approximation)**
+**linkern (fast heuristic):**
 ```bash
-linkern stipplings/tsp/photo_5000.tsp
-mv photo_5000.tour visualizations/tour/
-python visualize.py stipplings/tsp/photo_5000.tsp --tour-path visualizations/tour/photo_5000.tour
+linkern -o visualizations/tour/photo_5000.heu.tour stipplings/tsp/photo_5000.tsp
+python visualize.py stipplings/tsp/photo_5000.tsp --tour-path visualizations/tour/photo_5000.heu.tour --output visualizations/png/photo_5000_linkern.png
 ```
 
-**Option 2: Concorde (optimal solution)**
+**Concorde (default `.sol` output):**
 ```bash
 concorde stipplings/tsp/photo_5000.tsp
-python visualize.py stipplings/tsp/photo_5000.tsp --tour-path photo_5000.sol
+python visualize.py stipplings/tsp/photo_5000.tsp --tour-path photo_5000.sol --output visualizations/png/photo_5000_concorde.png
+```
+
+**Concorde (explicit TSPLIB TOUR output with `-o`):**
+```bash
+concorde -o visualizations/tour/photo_5000.opt.tour stipplings/tsp/photo_5000.tsp
+python visualize.py stipplings/tsp/photo_5000.tsp --tour-path visualizations/tour/photo_5000.opt.tour --output visualizations/png/photo_5000_concorde.png
+```
+
+**LKH (parameter-file based):**
+- LKH usually runs from a parameter file instead of direct CLI flags.
+- Include `PROBLEM_FILE = stipplings/tsp/photo_5000.tsp`.
+- Include a tour-output setting such as `TOUR_FILE = ...` or `OUTPUT_TOUR_FILE = ...` depending on your LKH version/configuration.
+- Then visualize the produced tour file:
+```bash
+python visualize.py stipplings/tsp/photo_5000.tsp --tour-path path/to/lkh-output.tour
+```
+
+**Custom LK solver output:**
+- Custom LK outputs `.heu.tour` in TSPLIB TOUR format.
+```bash
+python visualize.py stipplings/tsp/photo_5000.tsp --tour-path path/to/photo_5000.heu.tour --output visualizations/png/photo_5000_custom_lk.png
 ```
 
 **Option 3: Online solvers**

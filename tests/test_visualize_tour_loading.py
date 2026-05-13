@@ -173,6 +173,26 @@ class TestLoadTour(unittest.TestCase):
         self.assertEqual(len(tour), expected_nodes)
         self.assertEqual(set(tour), set(range(expected_nodes)))
 
+    def test_examples_lkh_heu_tour(self):
+        tsp_path = Path("examples/filetest-lkh/random1000.tsp")
+        tour_path = Path("examples/filetest-lkh/filetest-lkh.heu.tour")
+
+        coords = visualize.load_tsp_coordinates(str(tsp_path))
+        tour = visualize.load_tour(str(tour_path), expected_nodes=len(coords))
+
+        self.assertEqual(len(tour), len(coords))
+        self.assertEqual(sorted(tour), list(range(len(coords))))
+
+    def test_examples_custom_lk_heu_tour(self):
+        tsp_path = Path("examples/filetest-lk/random1000.tsp")
+        tour_path = Path("examples/filetest-lk/random1000.heu.tour")
+
+        coords = visualize.load_tsp_coordinates(str(tsp_path))
+        tour = visualize.load_tour(str(tour_path), expected_nodes=len(coords))
+
+        self.assertEqual(len(tour), len(coords))
+        self.assertEqual(sorted(tour), list(range(len(coords))))
+
     def test_sol_with_tour_section_detected_as_tsplib_in_auto_mode(self):
         path = self._write_temp(
             "NAME: x\nTYPE: TOUR\nTOUR_SECTION\n1 2 3 4\n-1\nEOF\n",
