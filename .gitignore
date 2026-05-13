@@ -73,3 +73,12 @@ htmlcov/
 .dmypy.json
 dmypy.json
 # Test
+
+# Local system files
+.DS_Store
+
+# Concorde intermediate/output files not used as test fixtures
+*.res
+*.mas
+*.sav
+*.pul
